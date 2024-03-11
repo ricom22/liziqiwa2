@@ -38,6 +38,15 @@ import Layout from "../layouts/Layout.astro";
         const textHeight = 64 * (10/7);
         const textBottomPadding = 80;
 
+        const scoreTextSize = 32;
+        const scoreTextLeftPadding = 10;
+        const scoreTextTopPadding = 20;
+
+        const comboTextSize = drumWidth / 2;
+        const comboTextBottomPadding = 160;
+
+        const fpsTextSize = 32;
+
         // speed is a multiplier, where x means the notes move 1 pixel per frame
         const speed = (7) * 10;
 
@@ -83,11 +92,14 @@ import Layout from "../layouts/Layout.astro";
         let ok_text: p5.Image;
         let bad_text: p5.Image;
 
+        let taikoFont: p5.Font;
+
         let song;
         let don_sound;
         let ka_sound;
 
         let notesToDestroy: (string | number)[][] = [];
+        let notesBrokenCombo: string[] = [];
 
         let destroyedNoteBig: Boolean;
         let destroyedNoteType: NoteType;
@@ -100,9 +112,8 @@ import Layout from "../layouts/Layout.astro";
 
         let textMaintainedFrames: number;
 
+        let score = 0;
         let combo = 0;
-
-        let frameError = 0;
 
         enum NoteType {
             DON,
@@ -287,6 +298,8 @@ import Layout from "../layouts/Layout.astro";
             ok_text = p.loadImage("/sprites/ok_text.png");
             bad_text = p.loadImage("/sprites/bad_text.png");
 
+            taikoFont = p.loadFont("/fonts/Modified-DFPKanteiryu-XB.ttf");
+
             song = new Audio("/songs/Idol.ogg");
             don_sound = new Audio("/sounds/Don.wav");
             ka_sound = new Audio("/sounds/Katsu.wav");
@@ -309,10 +322,14 @@ import Layout from "../layouts/Layout.astro";
             p.background(255);
             p.strokeWeight(6);
             p.frameRate(frameRate);
+            p.textAlign(p.LEFT);
+            p.textFont(taikoFont);
         };
 
         const draw = (p: p5) => {
             p.clear();
+            p.stroke("#000000");
+            p.strokeWeight(6);
             // Scrolling Bar
             p.fill("#2C2A2C");
             p.rect(0, barY, window.innerWidth, barHeight);
@@ -342,6 +359,15 @@ import Layout from "../layouts/Layout.astro";
                 return true;
             });
 
+            // Check if current frame is more than 6 frames after xEnd of any note,
+            // if so, reset combo.
+            // Do not count notes that are in notesBrokenCombo.
+            if (notes.some((n) => n.xEnd < frame - 6 && !notesBrokenCombo.includes(n.id))) {
+                notesBrokenCombo = notes.filter((n) => n.xEnd < frame - 6).map((n) => n.id);
+                combo = 0;
+            }
+
+
             for (let i = 0; i < notes.length; ++i) {
                 const x = notes[i].getRealX(frame, p.deltaTime);
 
@@ -366,6 +392,7 @@ import Layout from "../layouts/Layout.astro";
             )
 
             p.strokeWeight(10);
+            p.stroke("#000000");
             p.line(0, barY, window.innerWidth, barY);
             p.line(0, barY + barHeight + bottomBarHeight, window.innerWidth, barY + barHeight + bottomBarHeight);
             p.strokeWeight(6);
@@ -427,8 +454,25 @@ import Layout from "../layouts/Layout.astro";
                 --tappedDrumMaintainedFrames;
             }
 
+            if (combo >= 10) {
+                p.noFill()
+                p.stroke("#000000");
+                p.strokeWeight(15);
+                p.textSize(comboTextSize);
+                p.textFont(taikoFont);
+                p.textAlign(p.CENTER);
+                p.text(combo, visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTextBottomPadding);
+                p.noStroke();
+                p.fill("#ffffff");
+                p.text(combo, visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTextBottomPadding);
+                p.textAlign(p.LEFT);
+            }
+
             p.fill("#FA4529");
-            p.text("fps: " + p.frameRate().toFixed(2), 10, 10);
+            p.noStroke();
+            p.textAlign(p.LEFT);
+            p.textSize(fpsTextSize);
+            p.text("fps: " + p.frameRate().toFixed(2), 20, 20);
 
             frame += 1;
         };
@@ -462,10 +506,13 @@ import Layout from "../layouts/Layout.astro";
                 const accuracy = Math.abs(withoutToDestroy[closest].xEnd - frame);
                 if (accuracy < 2) {
                     notesToDestroy.push([withoutToDestroy[closest].id, 0]);
+                    ++combo;
                 } else if (accuracy < 4) {
                     notesToDestroy.push([withoutToDestroy[closest].id, 1]);
+                    ++combo;
                 } else if (accuracy < 6) {
                     notesToDestroy.push([withoutToDestroy[closest].id, 2]);
+                    combo = 0;
                 }
             }
         }
