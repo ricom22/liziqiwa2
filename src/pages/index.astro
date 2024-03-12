@@ -10,6 +10,7 @@ import Layout from "../layouts/Layout.astro";
 
         let enteredMainDrawLoop = false;
         let showTutorial = false;
+        let paused = false;
         let lastFrameKeyPressed = false;
 
         /* dimensions based on a 2028*1235 screen */
@@ -102,6 +103,18 @@ import Layout from "../layouts/Layout.astro";
         const tutorialHeight = innerHeight;
         const tutorialWidth = 3734 * (innerHeight / 2258);
 
+        const pauseWindowWidth = 0.2 * innerWidth;
+        const pauseWindowHeight = 0.2 * innerHeight;
+        const pauseWindowRadius = 0.02 * innerHeight;
+        // 32px
+        const pauseTextSize = 0.01577909270217 * innerWidth;
+
+        // 32px
+        const finalTextSize = 0.01577909270217 * innerWidth
+        // 80px
+        const finalTextLeftPadding = 0.039447731755424 * innerWidth;
+        // 200px
+        const finalTextBottomPadding = 0.161943319838057 * innerHeight;
 
         // speed is a multiplier, where x means the notes move 1 pixel per frame
         const speed = (7) * 10;
@@ -200,6 +213,12 @@ import Layout from "../layouts/Layout.astro";
 
         let score = 0;
         let combo = 0;
+        let maxCombo = 0;
+
+        let songEndFrame: number;
+        let goodNotes = 0;
+        let okNotes = 0;
+        let badNotes = 0;
 
         enum NoteType {
             DON,
@@ -213,7 +232,7 @@ import Layout from "../layouts/Layout.astro";
         };
 
         const generateBezier = (start: number[], control1: number[], control2: number[], end: number[]) => {
-            return function(t) {
+            return function (t) {
                 let x = Math.pow(1 - t, 3) * start[0] + 3 * Math.pow(1 - t, 2) * t * control1[0] + 3 * (1 - t) * Math.pow(t, 2) * control2[0] + Math.pow(t, 3) * end[0];
                 let y = Math.pow(1 - t, 3) * start[1] + 3 * Math.pow(1 - t, 2) * t * control1[1] + 3 * (1 - t) * Math.pow(t, 2) * control2[1] + Math.pow(t, 3) * end[1];
                 return [x, y];
@@ -500,9 +519,46 @@ import Layout from "../layouts/Layout.astro";
             p.textFont(taikoFont);
             p.textSize(32);
             p.textAlign(p.CENTER, p.CENTER);
+
+            songEndFrame = song.duration * frameRate + (3 * frameRate);
         };
 
         const draw = (p: p5) => {
+            if (paused) {
+                p.fill("#FA4529");
+                p.stroke("#ffffff");
+                p.strokeWeight(5);
+                p.rect(innerWidth / 2 - pauseWindowWidth / 2, innerHeight / 2 - pauseWindowHeight / 2, pauseWindowWidth, pauseWindowHeight, pauseWindowRadius);
+                p.strokeWeight(baseStrokeWeight);
+                p.noStroke();
+                p.fill("#000000");
+                p.textSize(pauseTextSize);
+                p.textAlign(p.CENTER);
+                p.text("Paused", innerWidth / 2, innerHeight / 2);
+
+                return;
+            }
+
+            console.log(frame, songEndFrame);
+
+            if (frame >= songEndFrame) {
+                p.clear();
+                p.fill("#FA4529");
+                p.textSize(finalTextSize);
+                p.textAlign(p.LEFT);
+                p.background("#ffffff");
+                p.text("Song ended!", finalTextLeftPadding, innerHeight / 2 - finalTextBottomPadding);
+                p.text("Final Score: " + score.toFixed(0), finalTextLeftPadding, innerHeight / 2);
+                p.text("Good: " + goodNotes, finalTextLeftPadding, innerHeight / 2 + finalTextSize);
+                p.text("Ok: " + okNotes, finalTextLeftPadding, innerHeight / 2 + 2 * finalTextSize);
+                p.text("Bad: " + badNotes, finalTextLeftPadding, innerHeight / 2 + 3 * finalTextSize);
+                p.text("Longest Combo: " + maxCombo, finalTextLeftPadding, innerHeight / 2 + 4 * finalTextSize);
+
+                return;
+            }
+
+            maxCombo = Math.max(combo, maxCombo);
+
             p.clear();
             p.stroke("#000000");
             p.strokeWeight(baseStrokeWeight);
@@ -542,6 +598,10 @@ import Layout from "../layouts/Layout.astro";
                 notesBrokenCombo = notes.filter((n) => n.xEnd < frame - 6).map((n) => n.id);
                 combo = 0;
             }
+
+            let outOfFrameNotes = notes.filter((n) => n.getRealX(frame, p.deltaTime) < 0);
+            badNotes += outOfFrameNotes.length;
+            notes = notes.filter((n) => n.getRealX(frame, p.deltaTime) >= 0);
 
 
             for (let i = 0; i < notes.length; ++i) {
@@ -673,6 +733,20 @@ import Layout from "../layouts/Layout.astro";
 
         const keyPressed = (p: p5) => {
             if (enteredMainDrawLoop) {
+                if (p.keyCode === p.ESCAPE | p.key === 'q') {
+                    paused = !paused;
+                    if (paused) {
+                        song.pause();
+                    } else {
+                        song.play();
+                    }
+                    return;
+                }
+
+                if (paused) {
+                    return;
+                }
+
                 const noteIDsToDestroy = notesToDestroy.map((n) => n[0]);
                 const withoutToDestroy = notes.filter((n) => !noteIDsToDestroy.includes(n.id));
                 let closest = findClosestIndex(withoutToDestroy.map((n) => n.xEnd), frame);
@@ -700,6 +774,7 @@ import Layout from "../layouts/Layout.astro";
                 if (withoutToDestroy[closest].type === triggeredNoteType) {
                     const accuracy = Math.abs(withoutToDestroy[closest].xEnd - frame);
                     if (accuracy < 2) {
+                        ++goodNotes;
                         notesToDestroy.push([withoutToDestroy[closest].id, 0]);
                         ++combo;
                         if (scoreMode == 1) {
@@ -718,6 +793,7 @@ import Layout from "../layouts/Layout.astro";
                             }
                         }
                     } else if (accuracy < 6) {
+                        ++okNotes;
                         notesToDestroy.push([withoutToDestroy[closest].id, 1]);
                         ++combo;
                         if (scoreMode == 1) {
@@ -736,12 +812,13 @@ import Layout from "../layouts/Layout.astro";
                             }
                         }
                     } else if (accuracy < 8) {
+                        ++badNotes;
                         notesToDestroy.push([withoutToDestroy[closest].id, 2]);
                         combo = 0;
                     }
                 }
             }
-        }
+        };
 
         let sketch = (p: p5) => {
             p.preload = () => {
@@ -757,7 +834,6 @@ import Layout from "../layouts/Layout.astro";
 
             p.draw = () => {
                 if (!enteredMainDrawLoop) {
-                    console.log(p.keyIsPressed, p.keyCode, lastFrameKeyPressed, showTutorial, enteredMainDrawLoop);
                     p.image(
                         showTutorial ? tutorial : title_screen,
                         innerWidth / 2 - (showTutorial ? tutorialWidth : titleScreenWidth) / 2,
