@@ -39,11 +39,17 @@ import Layout from "../layouts/Layout.astro";
         const textBottomPadding = 80;
 
         const scoreTextSize = 32;
-        const scoreTextLeftPadding = 10;
+        const scoreTextRightPadding = 10;
         const scoreTextTopPadding = 20;
 
-        const comboTextSize = drumWidth / 2;
-        const comboTextBottomPadding = 160;
+        const scoreBackgroundWidth = 200;
+        const scoreBackgroundHeight = 50;
+        const scoreBackgroundRadius = 20;
+
+        const comboTextSize = drumWidth * 3 / 8;
+        const comboTextBottomPadding = 190;
+        const comboTitleSize = 30;
+        const comboTitleBottomPadding = 120;
 
         const fpsTextSize = 32;
 
@@ -55,6 +61,23 @@ import Layout from "../layouts/Layout.astro";
         let barDuration: number;
         // In seconds
         let offset: number;
+        /*
+        Scoring method that affects the final score. All scores are divided by 10, rounded towards negative infinity, then multiplied by 10.
+
+        Value of "1" - AC 8 to AC 14 generation scoring.
+        Combo multiplier rises by DIFF with each 10 combo until 100, after which it increases at a constant rate.
+        Formula: INIT + max(0, DIFF * floor((min(COMBO, 100) - 1) / 10))
+
+        Value of "2" - AC 0 generation scoring.
+        Similar to "1" with some DIFF multipliers missing.
+        Formula: INIT + DIFF * {100<=COMBO: 8, 50<=COMBO: 4, 30<=COMBO: 2, 10<=COMBO: 1, 0}
+
+        Default is "1".
+        */
+        let scoreMode: number = 1;
+
+        let scoreInit = 390;
+        let scoreDiff = 100;
 
         let frame = 0;
         const frameRate = 60;
@@ -457,16 +480,34 @@ import Layout from "../layouts/Layout.astro";
             if (combo >= 10) {
                 p.noFill()
                 p.stroke("#000000");
-                p.strokeWeight(15);
-                p.textSize(comboTextSize);
+                p.strokeWeight(12);
                 p.textFont(taikoFont);
                 p.textAlign(p.CENTER);
+
+                p.textSize(comboTextSize);
                 p.text(combo, visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTextBottomPadding);
+                p.textSize(comboTitleSize);
+                p.text("Combo", visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTitleBottomPadding);
+
                 p.noStroke();
                 p.fill("#ffffff");
+                p.textSize(comboTextSize);
                 p.text(combo, visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTextBottomPadding);
+                p.textSize(comboTitleSize);
+                p.text("Combo", visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTitleBottomPadding);
+
                 p.textAlign(p.LEFT);
             }
+
+            p.fill("#000000");
+            p.noStroke();
+            p.rect(0, barY, scoreBackgroundWidth, scoreBackgroundHeight, 0, 0, scoreBackgroundRadius, 0);
+
+            p.fill("#ffffff");
+            p.noStroke();
+            p.textAlign(p.RIGHT);
+            p.textSize(scoreTextSize);
+            p.text(score, scoreBackgroundWidth - scoreTextRightPadding, barY + scoreTextTopPadding);
 
             p.fill("#FA4529");
             p.noStroke();
@@ -507,10 +548,40 @@ import Layout from "../layouts/Layout.astro";
                 if (accuracy < 2) {
                     notesToDestroy.push([withoutToDestroy[closest].id, 0]);
                     ++combo;
-                } else if (accuracy < 4) {
+                    if (scoreMode == 1) {
+                        score += scoreInit + Math.max(0, scoreDiff * Math.floor(Math.min(combo, 100) - 1) / 10);
+                    } else if (scoreMode == 2) {
+                        if (combo >= 100) {
+                            score += scoreInit + scoreDiff * 8;
+                        } else if (combo >= 50) {
+                            score += scoreInit + scoreDiff * 4;
+                        } else if (combo >= 30) {
+                            score += scoreInit + scoreDiff * 2;
+                        } else if (combo >= 10) {
+                            score += scoreInit + scoreDiff;
+                        } else {
+                            score += scoreInit;
+                        }
+                    }
+                } else if (accuracy < 6) {
                     notesToDestroy.push([withoutToDestroy[closest].id, 1]);
                     ++combo;
-                } else if (accuracy < 6) {
+                    if (scoreMode == 1) {
+                        score += (scoreInit + Math.max(0, scoreDiff * Math.floor(Math.min(combo, 100) - 1) / 10)) / 2;
+                    } else if (scoreMode == 2) {
+                        if (combo >= 100) {
+                            score += (scoreInit + scoreDiff * 8) / 2;
+                        } else if (combo >= 50) {
+                            score += (scoreInit + scoreDiff * 4) / 2;
+                        } else if (combo >= 30) {
+                            score += (scoreInit + scoreDiff * 2) / 2;
+                        } else if (combo >= 10) {
+                            score += (scoreInit + scoreDiff) / 2;
+                        } else {
+                            score += (scoreInit) / 2;
+                        }
+                    }
+                } else if (accuracy < 8) {
                     notesToDestroy.push([withoutToDestroy[closest].id, 2]);
                     combo = 0;
                 }
