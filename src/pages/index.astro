@@ -489,12 +489,12 @@ import Layout from "../layouts/Layout.astro";
             title_screen = p.loadImage("/images/title_screen.png");
             tutorial = p.loadImage("/images/tutorial.png");
 
-            song = new Audio("/songs/Idol.ogg");
+            song = new Audio("/songs/Unwelcome School.ogg");
             don_sound = new Audio("/sounds/Don.wav");
             ka_sound = new Audio("/sounds/Katsu.wav");
 
             // Load the TJA file
-            fetch("/tjas/Idol.tja")
+            fetch("/tjas/Unwelcome School.tja")
                 .then((response) => response.text())
                 .then((contents) => {
                     const metadata = parseMetadata(contents);
