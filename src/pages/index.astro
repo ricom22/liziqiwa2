@@ -149,8 +149,8 @@ import Layout from "../layouts/Layout.astro";
 
         let courseName: string;
         let level: number;
-        let scoreInit;
-        let scoreDiff;
+        let scoreInit: number;
+        let scoreDiff: number;
 
         let frame = 0;
         const frameRate = 60;
@@ -193,9 +193,9 @@ import Layout from "../layouts/Layout.astro";
         let title_screen: p5.Image;
         let tutorial: p5.Image;
 
-        let song;
-        let don_sound;
-        let ka_sound;
+        let song: HTMLAudioElement;
+        let don_sound: HTMLAudioElement;
+        let ka_sound: HTMLAudioElement;
 
         let notesToDestroy: (string | number)[][] = [];
         let notesBrokenCombo: string[] = [];
@@ -294,7 +294,7 @@ import Layout from "../layouts/Layout.astro";
 
         let notes: Note[] = [];
 
-        const findClosestIndex = (arr, target) => {
+        const findClosestIndex = (arr: number[], target: number) => {
             let left = 0;
             let right = arr.length - 1;
 
@@ -583,7 +583,7 @@ import Layout from "../layouts/Layout.astro";
                     noteIDsToDestroy = noteIDsToDestroy.filter((id) => id !== n.id);
                     destroyedNoteBig = n.big;
                     destroyedNoteType = n.type;
-                    destroyedNoteAccuracy = <number>notesToDestroy.find((x) => x[0] === n.id)[1];
+                    destroyedNoteAccuracy = notesToDestroy.find((x) => x[0] === n.id)[1] as number;
                     maintainedFrames = 3;
                     textMaintainedFrames = 10;
                     return false;
@@ -733,7 +733,7 @@ import Layout from "../layouts/Layout.astro";
 
         const keyPressed = (p: p5) => {
             if (enteredMainDrawLoop) {
-                if (p.keyCode === p.ESCAPE | p.key === 'q') {
+                if (p.keyCode === p.ESCAPE || p.key === 'q') {
                     paused = !paused;
                     if (paused) {
                         song.pause();
@@ -855,7 +855,7 @@ import Layout from "../layouts/Layout.astro";
             }
         };
 
-        new p5(sketch, document.getElementById("sketch"));
+        new p5(sketch, document.getElementById("sketch") as HTMLElement);
     </script>
 
     <div id="sketch"></div>
