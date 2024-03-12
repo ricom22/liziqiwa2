@@ -232,7 +232,7 @@ import Layout from "../layouts/Layout.astro";
         };
 
         const generateBezier = (start: number[], control1: number[], control2: number[], end: number[]) => {
-            return function (t) {
+            return (t: number) => {
                 let x = Math.pow(1 - t, 3) * start[0] + 3 * Math.pow(1 - t, 2) * t * control1[0] + 3 * (1 - t) * Math.pow(t, 2) * control2[0] + Math.pow(t, 3) * end[0];
                 let y = Math.pow(1 - t, 3) * start[1] + 3 * Math.pow(1 - t, 2) * t * control1[1] + 3 * (1 - t) * Math.pow(t, 2) * control2[1] + Math.pow(t, 3) * end[1];
                 return [x, y];
@@ -489,12 +489,12 @@ import Layout from "../layouts/Layout.astro";
             title_screen = p.loadImage("/images/title_screen.png");
             tutorial = p.loadImage("/images/tutorial.png");
 
-            song = new Audio("/songs/Unwelcome School.ogg");
+            song = new Audio("/songs/Idol.ogg");
             don_sound = new Audio("/sounds/Don.wav");
             ka_sound = new Audio("/sounds/Katsu.wav");
 
             // Load the TJA file
-            fetch("/tjas/Unwelcome School.tja")
+            fetch("/tjas/Idol.tja")
                 .then((response) => response.text())
                 .then((contents) => {
                     const metadata = parseMetadata(contents);
@@ -583,7 +583,7 @@ import Layout from "../layouts/Layout.astro";
                     noteIDsToDestroy = noteIDsToDestroy.filter((id) => id !== n.id);
                     destroyedNoteBig = n.big;
                     destroyedNoteType = n.type;
-                    destroyedNoteAccuracy = notesToDestroy.find((x) => x[0] === n.id)[1] as number;
+                    destroyedNoteAccuracy = (notesToDestroy.find((x) => x[0] === n.id) as (string | number)[])[1] as number;
                     maintainedFrames = 3;
                     textMaintainedFrames = 10;
                     return false;
@@ -758,7 +758,7 @@ import Layout from "../layouts/Layout.astro";
                     "k": NoteType.KA
                 };
 
-                const triggeredNoteType = keyToNoteType[p.key];
+                const triggeredNoteType: NoteType = keyToNoteType[p.key as ("d" | "f" | "j" | "k")];
 
                 const noteTypeToSound = {
                     [NoteType.DON]: don_sound,
@@ -769,7 +769,7 @@ import Layout from "../layouts/Layout.astro";
                 tappedDrumType = triggeredNoteType;
                 tappedDrumSide = p.key === 'd' || p.key === 'f' ? 0 : 1;
 
-                noteTypeToSound[triggeredNoteType]?.cloneNode(true).play();
+                (noteTypeToSound[triggeredNoteType]?.cloneNode(true) as HTMLAudioElement).play();
 
                 if (withoutToDestroy[closest].type === triggeredNoteType) {
                     const accuracy = Math.abs(withoutToDestroy[closest].xEnd - frame);
