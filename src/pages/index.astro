@@ -9,6 +9,8 @@ import Layout from "../layouts/Layout.astro";
         import {v4 as uuidv4} from 'uuid';
 
         let enteredMainDrawLoop = false;
+        let showTutorial = false;
+        let lastFrameKeyPressed = false;
 
         /* dimensions based on a 2028*1235 screen */
         // 350px
@@ -90,6 +92,17 @@ import Layout from "../layouts/Layout.astro";
         // 12px = 0.140659340659341 * comboTextSize
         const comboStrokeWeight = 0.005917159763314 * innerWidth;
 
+        // Prioritise height
+        // Title screen is 1920x1080
+        const titleScreenHeight = innerHeight;
+        // Scale to maintain aspect ratio
+        const titleScreenWidth = 1920 * (innerHeight / 1080);
+
+        // Tutorial is 3734x2258
+        const tutorialHeight = innerHeight;
+        const tutorialWidth = 3734 * (innerHeight / 2258);
+
+
         // speed is a multiplier, where x means the notes move 1 pixel per frame
         const speed = (7) * 10;
 
@@ -163,6 +176,9 @@ import Layout from "../layouts/Layout.astro";
         let bad_text: p5.Image;
 
         let taikoFont: p5.Font;
+
+        let title_screen: p5.Image;
+        let tutorial: p5.Image;
 
         let song;
         let don_sound;
@@ -451,6 +467,9 @@ import Layout from "../layouts/Layout.astro";
 
             taikoFont = p.loadFont("/fonts/Modified-DFPKanteiryu-XB.ttf");
 
+            title_screen = p.loadImage("/images/title_screen.png");
+            tutorial = p.loadImage("/images/tutorial.png");
+
             song = new Audio("/songs/Idol.ogg");
             don_sound = new Audio("/sounds/Don.wav");
             ka_sound = new Audio("/sounds/Katsu.wav");
@@ -478,8 +497,9 @@ import Layout from "../layouts/Layout.astro";
             p.background(255);
             p.strokeWeight(baseStrokeWeight);
             p.frameRate(frameRate);
-            p.textAlign(p.LEFT);
             p.textFont(taikoFont);
+            p.textSize(32);
+            p.textAlign(p.CENTER, p.CENTER);
         };
 
         const draw = (p: p5) => {
@@ -652,71 +672,73 @@ import Layout from "../layouts/Layout.astro";
         };
 
         const keyPressed = (p: p5) => {
-            const noteIDsToDestroy = notesToDestroy.map((n) => n[0]);
-            const withoutToDestroy = notes.filter((n) => !noteIDsToDestroy.includes(n.id));
-            let closest = findClosestIndex(withoutToDestroy.map((n) => n.xEnd), frame);
+            if (enteredMainDrawLoop) {
+                const noteIDsToDestroy = notesToDestroy.map((n) => n[0]);
+                const withoutToDestroy = notes.filter((n) => !noteIDsToDestroy.includes(n.id));
+                let closest = findClosestIndex(withoutToDestroy.map((n) => n.xEnd), frame);
 
-            const keyToNoteType = {
-                "d": NoteType.KA,
-                "f": NoteType.DON,
-                "j": NoteType.DON,
-                "k": NoteType.KA
-            };
+                const keyToNoteType = {
+                    "d": NoteType.KA,
+                    "f": NoteType.DON,
+                    "j": NoteType.DON,
+                    "k": NoteType.KA
+                };
 
-            const triggeredNoteType = keyToNoteType[p.key];
+                const triggeredNoteType = keyToNoteType[p.key];
 
-            const noteTypeToSound = {
-                [NoteType.DON]: don_sound,
-                [NoteType.KA]: ka_sound
-            };
+                const noteTypeToSound = {
+                    [NoteType.DON]: don_sound,
+                    [NoteType.KA]: ka_sound
+                };
 
-            tappedDrumMaintainedFrames = 7;
-            tappedDrumType = triggeredNoteType;
-            tappedDrumSide = p.key === 'd' || p.key === 'f' ? 0 : 1;
+                tappedDrumMaintainedFrames = 7;
+                tappedDrumType = triggeredNoteType;
+                tappedDrumSide = p.key === 'd' || p.key === 'f' ? 0 : 1;
 
-            noteTypeToSound[triggeredNoteType]?.cloneNode(true).play();
+                noteTypeToSound[triggeredNoteType]?.cloneNode(true).play();
 
-            if (withoutToDestroy[closest].type === triggeredNoteType) {
-                const accuracy = Math.abs(withoutToDestroy[closest].xEnd - frame);
-                if (accuracy < 2) {
-                    notesToDestroy.push([withoutToDestroy[closest].id, 0]);
-                    ++combo;
-                    if (scoreMode == 1) {
-                        score += scoreInit + Math.max(0, scoreDiff * Math.floor(Math.min(combo, 100) - 1) / 10);
-                    } else if (scoreMode == 2) {
-                        if (combo >= 100) {
-                            score += scoreInit + scoreDiff * 8;
-                        } else if (combo >= 50) {
-                            score += scoreInit + scoreDiff * 4;
-                        } else if (combo >= 30) {
-                            score += scoreInit + scoreDiff * 2;
-                        } else if (combo >= 10) {
-                            score += scoreInit + scoreDiff;
-                        } else {
-                            score += scoreInit;
+                if (withoutToDestroy[closest].type === triggeredNoteType) {
+                    const accuracy = Math.abs(withoutToDestroy[closest].xEnd - frame);
+                    if (accuracy < 2) {
+                        notesToDestroy.push([withoutToDestroy[closest].id, 0]);
+                        ++combo;
+                        if (scoreMode == 1) {
+                            score += scoreInit + Math.max(0, scoreDiff * Math.floor(Math.min(combo, 100) - 1) / 10);
+                        } else if (scoreMode == 2) {
+                            if (combo >= 100) {
+                                score += scoreInit + scoreDiff * 8;
+                            } else if (combo >= 50) {
+                                score += scoreInit + scoreDiff * 4;
+                            } else if (combo >= 30) {
+                                score += scoreInit + scoreDiff * 2;
+                            } else if (combo >= 10) {
+                                score += scoreInit + scoreDiff;
+                            } else {
+                                score += scoreInit;
+                            }
                         }
-                    }
-                } else if (accuracy < 6) {
-                    notesToDestroy.push([withoutToDestroy[closest].id, 1]);
-                    ++combo;
-                    if (scoreMode == 1) {
-                        score += (scoreInit + Math.max(0, scoreDiff * Math.floor(Math.min(combo, 100) - 1) / 10)) / 2;
-                    } else if (scoreMode == 2) {
-                        if (combo >= 100) {
-                            score += (scoreInit + scoreDiff * 8) / 2;
-                        } else if (combo >= 50) {
-                            score += (scoreInit + scoreDiff * 4) / 2;
-                        } else if (combo >= 30) {
-                            score += (scoreInit + scoreDiff * 2) / 2;
-                        } else if (combo >= 10) {
-                            score += (scoreInit + scoreDiff) / 2;
-                        } else {
-                            score += (scoreInit) / 2;
+                    } else if (accuracy < 6) {
+                        notesToDestroy.push([withoutToDestroy[closest].id, 1]);
+                        ++combo;
+                        if (scoreMode == 1) {
+                            score += (scoreInit + Math.max(0, scoreDiff * Math.floor(Math.min(combo, 100) - 1) / 10)) / 2;
+                        } else if (scoreMode == 2) {
+                            if (combo >= 100) {
+                                score += (scoreInit + scoreDiff * 8) / 2;
+                            } else if (combo >= 50) {
+                                score += (scoreInit + scoreDiff * 4) / 2;
+                            } else if (combo >= 30) {
+                                score += (scoreInit + scoreDiff * 2) / 2;
+                            } else if (combo >= 10) {
+                                score += (scoreInit + scoreDiff) / 2;
+                            } else {
+                                score += (scoreInit) / 2;
+                            }
                         }
+                    } else if (accuracy < 8) {
+                        notesToDestroy.push([withoutToDestroy[closest].id, 2]);
+                        combo = 0;
                     }
-                } else if (accuracy < 8) {
-                    notesToDestroy.push([withoutToDestroy[closest].id, 2]);
-                    combo = 0;
                 }
             }
         }
@@ -729,20 +751,19 @@ import Layout from "../layouts/Layout.astro";
                 setup(p);
             };
 
+            p.mouseClicked = () => {
+                if (!enteredMainDrawLoop && !showTutorial) showTutorial = true;
+            };
+
             p.draw = () => {
                 if (!enteredMainDrawLoop) {
-                    p.textSize(32);
-                    p.textAlign(p.CENTER, p.CENTER);
-
-                    p.text("Press F or J for Red Notes, and D or K for Blue Notes. Click to start.", window.innerWidth / 2, window.innerHeight / 2);
-                }
-
-                if (p.mouseIsPressed && !enteredMainDrawLoop) {
-                    song.play();
-                    enteredMainDrawLoop = true;
-                }
-
-                if (enteredMainDrawLoop) {
+                    console.log(p.keyIsPressed, p.keyCode, lastFrameKeyPressed, showTutorial, enteredMainDrawLoop);
+                    p.image(showTutorial ? tutorial : title_screen, 0, 0, showTutorial ? tutorialWidth : titleScreenWidth, showTutorial ? tutorialHeight : titleScreenHeight);
+                    if (p.keyIsPressed && p.keyCode == p.ENTER && !lastFrameKeyPressed) {
+                        showTutorial ? (enteredMainDrawLoop = true, song.play()) : showTutorial = true;
+                    }
+                    lastFrameKeyPressed = p.keyIsPressed;
+                } else {
                     draw(p);
                 }
             };
