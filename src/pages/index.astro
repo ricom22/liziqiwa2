@@ -758,7 +758,13 @@ import Layout from "../layouts/Layout.astro";
             p.draw = () => {
                 if (!enteredMainDrawLoop) {
                     console.log(p.keyIsPressed, p.keyCode, lastFrameKeyPressed, showTutorial, enteredMainDrawLoop);
-                    p.image(showTutorial ? tutorial : title_screen, 0, 0, showTutorial ? tutorialWidth : titleScreenWidth, showTutorial ? tutorialHeight : titleScreenHeight);
+                    p.image(
+                        showTutorial ? tutorial : title_screen,
+                        innerWidth / 2 - (showTutorial ? tutorialWidth : titleScreenWidth) / 2,
+                        0,
+                        showTutorial ? tutorialWidth : titleScreenWidth,
+                        showTutorial ? tutorialHeight : titleScreenHeight
+                    );
                     if (p.keyIsPressed && p.keyCode == p.ENTER && !lastFrameKeyPressed) {
                         showTutorial ? (enteredMainDrawLoop = true, song.play()) : showTutorial = true;
                     }
