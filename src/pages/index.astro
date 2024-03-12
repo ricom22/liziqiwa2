@@ -10,57 +10,100 @@ import Layout from "../layouts/Layout.astro";
 
         let enteredMainDrawLoop = false;
 
-        const barY = 350;
-        const barHeight = 210;
+        /* dimensions based on a 2028*1235 screen */
+        // 350px
+        const barY = 0.283400809716599 * innerHeight;
+        // 210px
+        const barHeight = 0.17004048582996 * innerHeight;
 
-        const bottomBarHeight = 50;
+        // 50px
+        const bottomBarHeight = 0.040485829959514 * innerHeight;
 
-        const visualisationAreaWidth = 525;
+        // 525px
+        const visualisationAreaWidth = 0.25887573964497 * innerWidth;
 
         const padWidthRatio = 0.33;
-        const padX = window.innerWidth * padWidthRatio
+        const padX = innerWidth * padWidthRatio
         const padY = barY + barHeight / 2;
-        const padRadius = 175;
+        // 175px
+        const padRadius = 0.1417004048583 * innerHeight;
 
-        const noteRadius = 125;
-        const noteBigRadius = 200;
+        // 125px
+        const noteRadius = 0.101214574898785 * innerHeight;
+        // 200px
+        const noteBigRadius = 0.161943319838057 * innerHeight;
 
-        const splashRadius = 300
+        // 300px
+        const splashRadius = 0.242914979757085 * innerHeight;
 
         const drumWidth = 168 * (barHeight + bottomBarHeight) / 192;
         const drumHeight = 192 * (barHeight + bottomBarHeight) / 192;
-        const drumRightPadding = 15;
-        const drumTopPadding = 5;
+        // 15px
+        const drumRightPadding = 0.007396449704142 * innerWidth;
+        // 5px
+        const drumTopPadding = 0.004048582995951 * innerHeight;
 
-        const goodTextWidth = 112 * (10/7);
-        const okTextWidth = 72 * (10/7);
-        const badTextWidth = 88 * (10/7);
-        const textHeight = 64 * (10/7);
-        const textBottomPadding = 80;
+        // 112 * (10/7)px
+        const goodTextWidth = 0.078895463510848 * innerWidth;
+        // 72 * (10/7)px
+        const okTextWidth = 0.050718512256974 * innerWidth;
+        // 88 * (10/7)px
+        const badTextWidth = 0.061989292758524 * innerWidth;
+        // 64 * (10/7)px
+        const textHeight = 0.045083122006199 * innerWidth;
+        // 80px
+        const textBottomPadding = 0.064777327935223 * innerHeight;
 
-        const scoreTextSize = 32;
-        const scoreTextRightPadding = 10;
-        const scoreTextTopPadding = 20;
+        // 32px
+        const scoreTextSize = 0.01577909270217 * innerWidth;
+        // 10px
+        const scoreTextRightPadding = 0.004930966469428 * innerWidth;
+        // 20px
+        const scoreTextTopPadding = 0.016194331983806 * innerHeight;
 
-        const scoreBackgroundWidth = 200;
-        const scoreBackgroundHeight = 50;
-        const scoreBackgroundRadius = 20;
+        // 200px
+        const scoreBackgroundWidth = 0.09861932938856 * innerWidth;
+        // 50px
+        const scoreBackgroundHeight = 0.040485829959514 * innerHeight;
+        // 20px
+        const scoreBackgroundRadius = 0.016194331983806 * innerHeight;
 
         const comboTextSize = drumWidth * 3 / 8;
-        const comboTextBottomPadding = 190;
-        const comboTitleSize = 30;
-        const comboTitleBottomPadding = 120;
+        // 190px
+        const comboTextBottomPadding = 0.153846153846154 * innerHeight;
+        // 30px
+        const comboTitleSize = 0.014792899408284 * innerWidth;
+        // 120px
+        const comboTitleBottomPadding = 0.097165991902834 * innerHeight;
 
-        const fpsTextSize = 32;
+        // 18px
+        const fpsTextSize = 0.00887573964497 * innerWidth;
+        // 25px
+        const fpsTextTopPadding = 0.020242914979757 * innerHeight;
+        // 20px
+        const fpsTextLeftPadding = 0.009861932938856 * innerWidth;
+
+        // 6px
+        const baseStrokeWeight = 0.002958579881657 * innerWidth;
+        // 10px = 0.047619047619048 * barHeight
+        const barBorderStrokeWeight = 0.008097165991903 * innerHeight;
+        // 12px = 0.140659340659341 * comboTextSize
+        const comboStrokeWeight = 0.005917159763314 * innerWidth;
 
         // speed is a multiplier, where x means the notes move 1 pixel per frame
         const speed = (7) * 10;
 
+        let title: string;
+        let subtitle: string;
         let bpm: number;
+        // Name of .wav file of Song.
+        let wave: string;
         // In seconds
         let barDuration: number;
         // In seconds
         let offset: number;
+        let demoStart: number;
+
         /*
         Scoring method that affects the final score. All scores are divided by 10, rounded towards negative infinity, then multiplied by 10.
 
@@ -76,8 +119,12 @@ import Layout from "../layouts/Layout.astro";
         */
         let scoreMode: number = 1;
 
-        let scoreInit = 390;
-        let scoreDiff = 100;
+        let courses: Course[];
+
+        let courseName: string;
+        let level: number;
+        let scoreInit;
+        let scoreDiff;
 
         let frame = 0;
         const frameRate = 60;
@@ -194,6 +241,22 @@ import Layout from "../layouts/Layout.astro";
             }
         }
 
+        class Course {
+            courseName: string;
+            level: number;
+            scoreInit: number;
+            scoreDiff: number;
+            notes: Note[];
+
+            constructor(courseName: string, level: number, scoreInit: number, scoreDiff: number, notes: Note[]) {
+                this.courseName = courseName;
+                this.level = level;
+                this.scoreInit = scoreInit;
+                this.scoreDiff = scoreDiff;
+                this.notes = notes;
+            }
+        }
+
         let notes: Note[] = [];
 
         const findClosestIndex = (arr, target) => {
@@ -245,7 +308,7 @@ import Layout from "../layouts/Layout.astro";
             return metadata;
         }
 
-        const parseNotes = (contents: string): Note[] => {
+        const parseCourse = (contents: string): Course => {
             let parsedNotes: Note[] = [];
 
             // Go to #Start
@@ -256,6 +319,23 @@ import Layout from "../layouts/Layout.astro";
                     start = i;
                     break;
                 }
+            }
+
+            // Course metadata before #START.
+            const unparsedMetadata = lines.slice(0, start);
+            let courseMetadata = parseMetadata(unparsedMetadata.join('\n'));
+
+            const courseName = courseMetadata["COURSE"];
+            const level = parseInt(courseMetadata["LEVEL"]);
+            let scoreInit = parseInt(courseMetadata["SCOREINIT"]);
+            let scoreDiff = parseInt(courseMetadata["SCOREDIFF"])
+
+            if (isNaN(scoreInit)) {
+                scoreInit = 390;
+            }
+
+            if (isNaN(scoreDiff)) {
+                scoreDiff = 100;
             }
 
             // Discard all lines before and including #Start
@@ -285,7 +365,55 @@ import Layout from "../layouts/Layout.astro";
                 }
             }
 
-            return parsedNotes;
+            return new Course(courseName, level, scoreInit, scoreDiff, parsedNotes);
+        }
+
+        const parseCourses = (contents: string): Course[] => {
+            let lines = contents.split('\n');
+            // Find #START.
+            let linePointer = 0;
+            for (let i = 0; i < lines.length; ++i) {
+                if (lines[i].trim() === '#START') {
+                    linePointer = i;
+                    break;
+                }
+            }
+
+            // Backtrack one line (should be newline).
+            linePointer -= 1;
+
+            // Backtrack more, until we find another newline.
+            while (lines[linePointer].trim() !== '') {
+                linePointer -= 1;
+            }
+
+            // Now, linePointer is at the newline before the first course.
+            // We can split the file into courses.
+
+            let courses: Course[] = [];
+            let courseContents = '';
+
+            // Start from linePointer + 1, because we want to skip the newline.
+            // The first course is until #END.
+            for (let i = linePointer + 1; i < lines.length; ++i) {
+                if (lines[i].trim() === '#END') {
+                    courseContents += lines[i];
+                    courses.push(parseCourse(courseContents));
+                    courseContents = '';
+                } else {
+                    courseContents += lines[i] + '\n';
+                }
+            }
+
+            return courses;
+        }
+
+        const selectCourse = (courses: Course[], courseNumber: number) => {
+            courseName = courses[courseNumber].courseName;
+            level = courses[courseNumber].level;
+            scoreInit = courses[courseNumber].scoreInit;
+            scoreDiff = courses[courseNumber].scoreDiff;
+            notes = courses[courseNumber].notes;
         }
 
         const preload = (p: p5) => {
@@ -332,18 +460,23 @@ import Layout from "../layouts/Layout.astro";
                 .then((response) => response.text())
                 .then((contents) => {
                     const metadata = parseMetadata(contents);
+                    title = metadata["TITLE"];
+                    subtitle = metadata["SUBTITLE"];
                     bpm = parseFloat(metadata["BPM"]);
+                    wave = metadata["WAVE"];
                     barDuration = 4 * 60 / bpm;
                     offset = parseFloat(metadata["OFFSET"]);
-                    notes = parseNotes(contents);
-                    console.log(bpm, barDuration, offset);
+                    demoStart = parseFloat(metadata["DEMOSTART"]);
+
+                    courses = parseCourses(contents);
+                    selectCourse(courses, 1);
                 });
         };
 
         const setup = (p: p5) => {
             p.createCanvas(window.innerWidth, window.innerHeight);
             p.background(255);
-            p.strokeWeight(6);
+            p.strokeWeight(baseStrokeWeight);
             p.frameRate(frameRate);
             p.textAlign(p.LEFT);
             p.textFont(taikoFont);
@@ -352,7 +485,7 @@ import Layout from "../layouts/Layout.astro";
         const draw = (p: p5) => {
             p.clear();
             p.stroke("#000000");
-            p.strokeWeight(6);
+            p.strokeWeight(baseStrokeWeight);
             // Scrolling Bar
             p.fill("#2C2A2C");
             p.rect(0, barY, window.innerWidth, barHeight);
@@ -414,11 +547,11 @@ import Layout from "../layouts/Layout.astro";
                 drumHeight
             )
 
-            p.strokeWeight(10);
+            p.strokeWeight(barBorderStrokeWeight);
             p.stroke("#000000");
             p.line(0, barY, window.innerWidth, barY);
             p.line(0, barY + barHeight + bottomBarHeight, window.innerWidth, barY + barHeight + bottomBarHeight);
-            p.strokeWeight(6);
+            p.strokeWeight(baseStrokeWeight);
 
             if (maintainedFrames) {
                 if (destroyedNoteAccuracy !== 2) {
@@ -480,7 +613,7 @@ import Layout from "../layouts/Layout.astro";
             if (combo >= 10) {
                 p.noFill()
                 p.stroke("#000000");
-                p.strokeWeight(12);
+                p.strokeWeight(comboStrokeWeight);
                 p.textFont(taikoFont);
                 p.textAlign(p.CENTER);
 
@@ -513,7 +646,7 @@ import Layout from "../layouts/Layout.astro";
             p.noStroke();
             p.textAlign(p.LEFT);
             p.textSize(fpsTextSize);
-            p.text("fps: " + p.frameRate().toFixed(2), 20, 20);
+            p.text("fps: " + p.frameRate().toFixed(2), fpsTextLeftPadding, fpsTextTopPadding);
 
             frame += 1;
         };
