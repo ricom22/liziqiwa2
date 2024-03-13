@@ -519,8 +519,6 @@ import Layout from "../layouts/Layout.astro";
             p.textFont(taikoFont);
             p.textSize(32);
             p.textAlign(p.CENTER, p.CENTER);
-
-            songEndFrame = song.duration * frameRate + (3 * frameRate);
         };
 
         const draw = (p: p5) => {
@@ -539,9 +537,7 @@ import Layout from "../layouts/Layout.astro";
                 return;
             }
 
-            console.log(frame, songEndFrame);
-
-            if (frame >= songEndFrame) {
+            if (frame >= song.duration * frameRate + (3 * frameRate)) {
                 p.clear();
                 p.fill("#FA4529");
                 p.textSize(finalTextSize);
