@@ -2,853 +2,112 @@
 import Layout from "../layouts/Layout.astro";
 ---
 
-<!-- A Taiko no Tastujin clone -->
-<Layout title="Taiko no Shoshinsha">
+
+<!-- CEP WA2 -->
+<Layout title="CEP WA2">
     <script>
         import p5 from "p5";
-        import {v4 as uuidv4} from 'uuid';
+        import {
+            sin, cos, pi
+        } from "mathjs";
 
-        let enteredMainDrawLoop = false;
-        let showTutorial = false;
-        let paused = false;
-        let lastFrameKeyPressed = false;
-
-        /* dimensions based on a 2028*1235 screen */
-        // 350px
-        const barY = 0.283400809716599 * innerHeight;
-        // 210px
-        const barHeight = 0.17004048582996 * innerHeight;
-
-        // 50px
-        const bottomBarHeight = 0.040485829959514 * innerHeight;
-
-        // 525px
-        const visualisationAreaWidth = 0.25887573964497 * innerWidth;
-
-        const padWidthRatio = 0.33;
-        const padX = innerWidth * padWidthRatio
-        const padY = barY + barHeight / 2;
-        // 175px
-        const padRadius = 0.1417004048583 * innerHeight;
-
-        // 125px
-        const noteRadius = 0.101214574898785 * innerHeight;
-        // 200px
-        const noteBigRadius = 0.161943319838057 * innerHeight;
-
-        // 300px
-        const splashRadius = 0.242914979757085 * innerHeight;
-
-        const drumWidth = 168 * (barHeight + bottomBarHeight) / 192;
-        const drumHeight = 192 * (barHeight + bottomBarHeight) / 192;
-        // 15px
-        const drumRightPadding = 0.007396449704142 * innerWidth;
-        // 5px
-        const drumTopPadding = 0.004048582995951 * innerHeight;
-
-        // 112 * (10/7)px
-        const goodTextWidth = 0.078895463510848 * innerWidth;
-        // 72 * (10/7)px
-        const okTextWidth = 0.050718512256974 * innerWidth;
-        // 88 * (10/7)px
-        const badTextWidth = 0.061989292758524 * innerWidth;
-        // 64 * (10/7)px
-        const textHeight = 0.045083122006199 * innerWidth;
-        // 80px
-        const textBottomPadding = 0.064777327935223 * innerHeight;
-
-        // 32px
-        const scoreTextSize = 0.01577909270217 * innerWidth;
-        // 10px
-        const scoreTextRightPadding = 0.004930966469428 * innerWidth;
-        // 20px
-        const scoreTextTopPadding = 0.016194331983806 * innerHeight;
-
-        // 200px
-        const scoreBackgroundWidth = 0.09861932938856 * innerWidth;
-        // 50px
-        const scoreBackgroundHeight = 0.040485829959514 * innerHeight;
-        // 20px
-        const scoreBackgroundRadius = 0.016194331983806 * innerHeight;
-
-        const comboTextSize = drumWidth * 3 / 8;
-        // 190px
-        const comboTextBottomPadding = 0.153846153846154 * innerHeight;
-        // 30px
-        const comboTitleSize = 0.014792899408284 * innerWidth;
-        // 120px
-        const comboTitleBottomPadding = 0.097165991902834 * innerHeight;
-
-        // 18px
-        const fpsTextSize = 0.00887573964497 * innerWidth;
-        // 25px
-        const fpsTextTopPadding = 0.020242914979757 * innerHeight;
-        // 20px
-        const fpsTextLeftPadding = 0.009861932938856 * innerWidth;
-
-        // 6px
-        const baseStrokeWeight = 0.002958579881657 * innerWidth;
-        // 10px = 0.047619047619048 * barHeight
-        const barBorderStrokeWeight = 0.008097165991903 * innerHeight;
-        // 12px = 0.140659340659341 * comboTextSize
-        const comboStrokeWeight = 0.005917159763314 * innerWidth;
-
-        // Prioritise height
-        // Title screen is 1920x1080
-        const titleScreenHeight = innerHeight;
-        // Scale to maintain aspect ratio
-        const titleScreenWidth = 1920 * (innerHeight / 1080);
-
-        // Tutorial is 3734x2258
-        const tutorialHeight = innerHeight;
-        const tutorialWidth = 3734 * (innerHeight / 2258);
-
-        const pauseWindowWidth = 0.2 * innerWidth;
-        const pauseWindowHeight = 0.2 * innerHeight;
-        const pauseWindowRadius = 0.02 * innerHeight;
-        // 32px
-        const pauseTextSize = 0.01577909270217 * innerWidth;
-
-        // 32px
-        const finalTextSize = 0.01577909270217 * innerWidth
-        // 80px
-        const finalTextLeftPadding = 0.039447731755424 * innerWidth;
-        // 200px
-        const finalTextBottomPadding = 0.161943319838057 * innerHeight;
-
-        // speed is a multiplier, where x means the notes move 1 pixel per frame
-        const speed = (7) * 10;
-
-        let title: string;
-        let subtitle: string;
-        let bpm: number;
-        // Name of .wav file of Song.
-        let wave: string;
-        // In seconds
-        let barDuration: number;
-        // In seconds
-        let offset: number;
-        let demoStart: number;
-
-        /*
-        Scoring method that affects the final score. All scores are divided by 10, rounded towards negative infinity, then multiplied by 10.
-
-        Value of "1" - AC 8 to AC 14 generation scoring.
-        Combo multiplier rises by DIFF with each 10 combo until 100, after which it increases at a constant rate.
-        Formula: INIT + max(0, DIFF * floor((min(COMBO, 100) - 1) / 10))
-
-        Value of "2" - AC 0 generation scoring.
-        Similar to "1" with some DIFF multipliers missing.
-        Formula: INIT + DIFF * {100<=COMBO: 8, 50<=COMBO: 4, 30<=COMBO: 2, 10<=COMBO: 1, 0}
-
-        Default is "1".
-        */
-        let scoreMode: number = 1;
-
-        let courses: Course[];
-
-        let courseName: string;
-        let level: number;
-        let scoreInit: number;
-        let scoreDiff: number;
-
-        let frame = 0;
-        const frameRate = 60;
-
-        // sprites
-        let don_1: p5.Image;
-        let ka_1: p5.Image;
-
-        let b_don_4: p5.Image;
-        let b_ka_4: p5.Image;
-
-        let pad: p5.Image;
-
-        let good: p5.Image;
-        let ok: p5.Image;
-
-        let b_good: p5.Image;
-        let b_ok: p5.Image;
-
-        let pad_good: p5.Image;
-        let pad_ok: p5.Image;
-
-        let b_pad_good: p5.Image;
-        let b_pad_ok: p5.Image;
-
-        let drum: p5.Image;
-
-        let drum_don_right: p5.Image;
-        let drum_don_left: p5.Image;
-
-        let drum_ka_right: p5.Image;
-        let drum_ka_left: p5.Image;
-
-        let good_text: p5.Image;
-        let ok_text: p5.Image;
-        let bad_text: p5.Image;
-
-        let taikoFont: p5.Font;
-
-        let title_screen: p5.Image;
-        let tutorial: p5.Image;
-
-        let song: HTMLAudioElement;
-        let don_sound: HTMLAudioElement;
-        let ka_sound: HTMLAudioElement;
-
-        let notesToDestroy: (string | number)[][] = [];
-        let notesBrokenCombo: string[] = [];
-
-        let destroyedNoteBig: Boolean;
-        let destroyedNoteType: NoteType;
-        let destroyedNoteAccuracy: number;
-        let maintainedFrames: number;
-
-        let tappedDrumType: NoteType;
-        let tappedDrumSide: number;
-        let tappedDrumMaintainedFrames: number;
-
-        let textMaintainedFrames: number;
-
-        let score = 0;
-        let combo = 0;
-        let maxCombo = 0;
-
-        let songEndFrame: number;
-        let goodNotes = 0;
-        let okNotes = 0;
-        let badNotes = 0;
-
-        enum NoteType {
-            DON,
-            KA
+        /* Types */
+        type Vector = {
+            x: number,
+            y: number
         }
 
-        const line = (x1: number, y1: number, x2: number, y2: number) => {
-            const m = (y2 - y1) / (x2 - x1);
-            const c = y1 - m * x1;
-            return (x: number) => m * x + c;
-        };
-
-        const generateBezier = (start: number[], control1: number[], control2: number[], end: number[]) => {
-            return (t: number) => {
-                let x = Math.pow(1 - t, 3) * start[0] + 3 * Math.pow(1 - t, 2) * t * control1[0] + 3 * (1 - t) * Math.pow(t, 2) * control2[0] + Math.pow(t, 3) * end[0];
-                let y = Math.pow(1 - t, 3) * start[1] + 3 * Math.pow(1 - t, 2) * t * control1[1] + 3 * (1 - t) * Math.pow(t, 2) * control2[1] + Math.pow(t, 3) * end[1];
-                return [x, y];
-            };
+        type Scalar = {
+            magnitude: number
         }
 
-        const easeOutCurve = generateBezier([0, 0], [0.5, 0], [0, 0.4], [1, 0.8]);
-
-        class Note {
-            id: string = uuidv4();
-            x: number;
-            xEnd: number;
-            xStart: number;
-            yEnd: number;
-            type: NoteType;
-            big: boolean;
-
-            f: (x: number) => number;
-
-            constructor(x: number, type: NoteType = NoteType.DON, big: boolean = false) {
-                this.x = x;
-                // xEnd represents frame, and yEnd represents the x position of the note.
-                // When the Note reaches the pad, its x position will be yEnd, on frame xEnd.
-                this.xEnd = x * frameRate;
-                this.xStart = this.xEnd - speed;
-                this.yEnd = padX;
-                this.type = type;
-                this.big = big;
-
-                this.f = line(this.xStart, window.innerWidth, this.xEnd, this.yEnd);
-            }
-
-            getRealX = (frame: number, deltaTime: number) => {
-                // This is the x coordinate of the note.
-                // Using deltaTime, we can calculate the x position of the note at any given frame.
-                return this.f(frame);
-            };
-
-            size = () => {
-                return this.big ? noteBigRadius : noteRadius;
+        // Compute the partial derivative of f with respect to x
+        function partialDerivativeX(f: ((x, y) => number), h: number = 1e-6) {
+            return (x, y) => {
+                return (f(x + h, y) - f(x, y)) / h;
             }
         }
 
-        class Course {
-            courseName: string;
-            level: number;
-            scoreInit: number;
-            scoreDiff: number;
-            notes: Note[];
-
-            constructor(courseName: string, level: number, scoreInit: number, scoreDiff: number, notes: Note[]) {
-                this.courseName = courseName;
-                this.level = level;
-                this.scoreInit = scoreInit;
-                this.scoreDiff = scoreDiff;
-                this.notes = notes;
+        // Compute the partial derivative of f with respect to y
+        function partialDerivativeY(f: ((x, y) => number), h: number = 1e-6) {
+            return (x, y) => {
+                return (f(x, y + h) - f(x, y)) / h;
             }
         }
 
-        let notes: Note[] = [];
-
-        const findClosestIndex = (arr: number[], target: number) => {
-            let left = 0;
-            let right = arr.length - 1;
-
-            while (left <= right) {
-                let mid = Math.floor((left + right) / 2);
-
-                if (arr[mid] === target) {
-                    return mid;
-                } else if (arr[mid] < target) {
-                    left = mid + 1;
-                } else {
-                    right = mid - 1;
-                }
-            }
-
-            // At this point, left is the index where the target should be inserted
-            // to maintain sorted order. So, we check which is closer, left or right.
-            if (left >= arr.length) {
-                return right; // edge case if target is larger than any element in arr
-            } else if (right < 0) {
-                return left; // edge case if target is smaller than any element in arr
-            } else {
-                return (Math.abs(arr[left] - target) < Math.abs(arr[right] - target)) ? left : right;
+        const vectorFieldDo = (Fx, Fy): ((F: ((Fx, Fy) => Scalar | Vector)) => Scalar | Vector) => {
+            return (F: (Fx, Fy) => Scalar | Vector) => {
+                return F(Fx, Fy);
             }
         }
 
-        interface Metadata {
-            [key: string]: string;
+        const getCurl = (x, y): ((Fx, Fy) => Vector) => {
+            return (Fx, Fy) => {
+                const dFy_dx = partialDerivativeX(Fy)(x, y);
+                const dFx_dy = partialDerivativeY(Fx)(x, y);
+                return {
+                    x: dFy_dx - dFx_dy,
+                    y: 0
+                }; // 2D Curl is a vector quantity
+            }
         }
 
-        const parseMetadata = (contents: string): Metadata => {
-            const metadata: Metadata = {};
-            const lines = contents.split('\n');
-
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine.startsWith('#')) {
-                    break; // Stop parsing once we encounter a line starting with '#'
-                }
-                if (trimmedLine) {
-                    const [key, value] = trimmedLine.split(':');
-                    metadata[key.trim()] = value.trim();
-                }
+        const getVector = (x, y): ((Fx, Fy) => Vector) => {
+            return (Fx, Fy) => {
+                return {
+                    x: Fx(x, y),
+                    y: Fy(x, y)
+                };
             }
-
-            return metadata;
         }
-
-        const parseCourse = (contents: string): Course => {
-            let parsedNotes: Note[] = [];
-
-            // Go to #Start
-            let lines = contents.split('\n');
-            let start = 0;
-            for (let i = 0; i < lines.length; ++i) {
-                if (lines[i].trim() === '#START') {
-                    start = i;
-                    break;
-                }
-            }
-
-            // Course metadata before #START.
-            const unparsedMetadata = lines.slice(0, start);
-            let courseMetadata = parseMetadata(unparsedMetadata.join('\n'));
-
-            const courseName = courseMetadata["COURSE"];
-            const level = parseInt(courseMetadata["LEVEL"]);
-            let scoreInit = parseInt(courseMetadata["SCOREINIT"]);
-            let scoreDiff = parseInt(courseMetadata["SCOREDIFF"])
-
-            if (isNaN(scoreInit)) {
-                scoreInit = 390;
-            }
-
-            if (isNaN(scoreDiff)) {
-                scoreDiff = 100;
-            }
-
-            // Discard all lines before and including #Start
-            lines = lines.slice(start + 1);
-
-            // Discard all lines that start with #
-            lines = lines.filter((line) => !line.trim().startsWith('#'));
-
-            // Discard all blank lines
-            lines = lines.filter((line) => line.trim() !== '');
-
-            // Parse the notes
-            for (let i = 0; i < lines.length; ++i) {
-                lines[i] = lines[i].trim().slice(0, -1);
-                const duration = barDuration / lines[i].length;
-
-                for (let j = 0; j < lines[i].length; ++j) {
-                    if (lines[i][j] === '1') {
-                        parsedNotes.push(new Note(j * duration + (i * barDuration) - offset, NoteType.DON));
-                    } else if (lines[i][j] === '2') {
-                        parsedNotes.push(new Note(j * duration + (i * barDuration) - offset, NoteType.KA));
-                    } else if (lines[i][j] === '3') {
-                        parsedNotes.push(new Note(j * duration + (i * barDuration) - offset, NoteType.DON, true));
-                    } else if (lines[i][j] === '4') {
-                        parsedNotes.push(new Note(j * duration + (i * barDuration) - offset, NoteType.KA, true));
-                    }
-                }
-            }
-
-            return new Course(courseName, level, scoreInit, scoreDiff, parsedNotes);
-        }
-
-        const parseCourses = (contents: string): Course[] => {
-            let lines = contents.split('\n');
-            // Find #START.
-            let linePointer = 0;
-            for (let i = 0; i < lines.length; ++i) {
-                if (lines[i].trim() === '#START') {
-                    linePointer = i;
-                    break;
-                }
-            }
-
-            // Backtrack one line (should be newline).
-            linePointer -= 1;
-
-            // Backtrack more, until we find another newline.
-            while (lines[linePointer].trim() !== '') {
-                linePointer -= 1;
-            }
-
-            // Now, linePointer is at the newline before the first course.
-            // We can split the file into courses.
-
-            let courses: Course[] = [];
-            let courseContents = '';
-
-            // Start from linePointer + 1, because we want to skip the newline.
-            // The first course is until #END.
-            for (let i = linePointer + 1; i < lines.length; ++i) {
-                if (lines[i].trim() === '#END') {
-                    courseContents += lines[i];
-                    courses.push(parseCourse(courseContents));
-                    courseContents = '';
-                } else {
-                    courseContents += lines[i] + '\n';
-                }
-            }
-
-            return courses;
-        }
-
-        const selectCourse = (courses: Course[], courseNumber: number) => {
-            courseName = courses[courseNumber].courseName;
-            level = courses[courseNumber].level;
-            scoreInit = courses[courseNumber].scoreInit;
-            scoreDiff = courses[courseNumber].scoreDiff;
-            notes = courses[courseNumber].notes;
-        }
-
-        const preload = (p: p5) => {
-            don_1 = p.loadImage("/sprites/don_1.png");
-            ka_1 = p.loadImage("/sprites/ka_1.png");
-
-            b_don_4 = p.loadImage("/sprites/b_don_4.png");
-            b_ka_4 = p.loadImage("/sprites/b_ka_4.png");
-
-            pad = p.loadImage("/sprites/pad.png");
-
-            good = p.loadImage("/sprites/good.png");
-            ok = p.loadImage("/sprites/ok.png");
-
-            b_good = p.loadImage("/sprites/b_good.png");
-            b_ok = p.loadImage("/sprites/b_ok.png");
-
-            pad_good = p.loadImage("/sprites/pad_good.png");
-            pad_ok = p.loadImage("/sprites/pad_ok.png");
-
-            b_pad_good = p.loadImage("/sprites/b_pad_good.png");
-            b_pad_ok = p.loadImage("/sprites/b_pad_ok.png");
-
-            drum = p.loadImage("/sprites/drum.png");
-
-            drum_don_right = p.loadImage("/sprites/drum_don_right.png");
-            drum_don_left = p.loadImage("/sprites/drum_don_left.png");
-
-            drum_ka_right = p.loadImage("/sprites/drum_ka_right.png");
-            drum_ka_left = p.loadImage("/sprites/drum_ka_left.png");
-
-            good_text = p.loadImage("/sprites/good_text.png");
-            ok_text = p.loadImage("/sprites/ok_text.png");
-            bad_text = p.loadImage("/sprites/bad_text.png");
-
-            taikoFont = p.loadFont("/fonts/Modified-DFPKanteiryu-XB.ttf");
-
-            title_screen = p.loadImage("/images/title_screen.png");
-            tutorial = p.loadImage("/images/tutorial.png");
-
-            song = new Audio("/songs/Idol.ogg");
-            don_sound = new Audio("/sounds/Don.wav");
-            ka_sound = new Audio("/sounds/Katsu.wav");
-
-            // Load the TJA file
-            fetch("/tjas/Idol.tja")
-                .then((response) => response.text())
-                .then((contents) => {
-                    const metadata = parseMetadata(contents);
-                    title = metadata["TITLE"];
-                    subtitle = metadata["SUBTITLE"];
-                    bpm = parseFloat(metadata["BPM"]);
-                    wave = metadata["WAVE"];
-                    barDuration = 4 * 60 / bpm;
-                    offset = parseFloat(metadata["OFFSET"]);
-                    demoStart = parseFloat(metadata["DEMOSTART"]);
-
-                    courses = parseCourses(contents);
-                    selectCourse(courses, 1);
-                });
-        };
 
         const setup = (p: p5) => {
-            p.createCanvas(window.innerWidth, window.innerHeight);
+            p.createCanvas(p.displayWidth, p.displayHeight);
             p.background(255);
-            p.strokeWeight(baseStrokeWeight);
-            p.frameRate(frameRate);
-            p.textFont(taikoFont);
-            p.textSize(32);
-            p.textAlign(p.CENTER, p.CENTER);
-        };
+        }
 
         const draw = (p: p5) => {
-            if (paused) {
-                p.fill("#FA4529");
-                p.stroke("#ffffff");
-                p.strokeWeight(5);
-                p.rect(innerWidth / 2 - pauseWindowWidth / 2, innerHeight / 2 - pauseWindowHeight / 2, pauseWindowWidth, pauseWindowHeight, pauseWindowRadius);
-                p.strokeWeight(baseStrokeWeight);
-                p.noStroke();
-                p.fill("#000000");
-                p.textSize(pauseTextSize);
-                p.textAlign(p.CENTER);
-                p.text("Paused", innerWidth / 2, innerHeight / 2);
-
-                return;
+            p.background(255);
+            // Fx(x, y) => x-coord of vector field at (x, y)
+            const Fx = (x, y) => {
+                return sin(x+y);
             }
 
-            if (frame >= song.duration * frameRate + (3 * frameRate)) {
-                p.clear();
-                p.fill("#FA4529");
-                p.textSize(finalTextSize);
-                p.textAlign(p.LEFT);
-                p.background("#ffffff");
-                p.text("Song ended!", finalTextLeftPadding, innerHeight / 2 - finalTextBottomPadding);
-                p.text("Final Score: " + score.toFixed(0), finalTextLeftPadding, innerHeight / 2);
-                p.text("Good: " + goodNotes, finalTextLeftPadding, innerHeight / 2 + finalTextSize);
-                p.text("Ok: " + okNotes, finalTextLeftPadding, innerHeight / 2 + 2 * finalTextSize);
-                p.text("Bad: " + badNotes, finalTextLeftPadding, innerHeight / 2 + 3 * finalTextSize);
-                p.text("Longest Combo: " + maxCombo, finalTextLeftPadding, innerHeight / 2 + 4 * finalTextSize);
-
-                return;
+            // Fy(x, y) => y-coord of vector field at (x, y)
+            const Fy = (x, y) => {
+                return cos(x-y);
             }
 
-            maxCombo = Math.max(combo, maxCombo);
-
-            p.clear();
-            p.stroke("#000000");
-            p.strokeWeight(baseStrokeWeight);
-            // Scrolling Bar
-            p.fill("#2C2A2C");
-            p.rect(0, barY, window.innerWidth, barHeight);
-
-            p.fill("#847F84");
-            p.rect(0, barY + barHeight, window.innerWidth, bottomBarHeight);
-
-            p.image(
-                pad,
-                padX - padRadius / 2,
-                padY - padRadius / 2,
-                padRadius,
-                padRadius
-            )
-
-            let noteIDsToDestroy = notesToDestroy.map((n) => n[0]);
-            notes = notes.filter((n) => {
-                if (noteIDsToDestroy.includes(n.id) && n.xEnd <= frame) {
-                    noteIDsToDestroy = noteIDsToDestroy.filter((id) => id !== n.id);
-                    destroyedNoteBig = n.big;
-                    destroyedNoteType = n.type;
-                    destroyedNoteAccuracy = (notesToDestroy.find((x) => x[0] === n.id) as (string | number)[])[1] as number;
-                    maintainedFrames = 3;
-                    textMaintainedFrames = 10;
-                    return false;
-                }
-                return true;
-            });
-
-            // Check if current frame is more than 6 frames after xEnd of any note,
-            // if so, reset combo.
-            // Do not count notes that are in notesBrokenCombo.
-            if (notes.some((n) => n.xEnd < frame - 6 && !notesBrokenCombo.includes(n.id))) {
-                notesBrokenCombo = notes.filter((n) => n.xEnd < frame - 6).map((n) => n.id);
-                combo = 0;
-            }
-
-            let outOfFrameNotes = notes.filter((n) => n.getRealX(frame, p.deltaTime) < 0);
-            badNotes += outOfFrameNotes.length;
-            notes = notes.filter((n) => n.getRealX(frame, p.deltaTime) >= 0);
-
-
-            for (let i = 0; i < notes.length; ++i) {
-                const x = notes[i].getRealX(frame, p.deltaTime);
-
-                p.image(
-                    notes[i].type === NoteType.DON ? (notes[i].big ? b_don_4 : don_1) : (notes[i].big ? b_ka_4 : ka_1),
-                    x - notes[i].size() / 2,
-                    barY + barHeight / 2 - notes[i].size() / 2,
-                    notes[i].size(),
-                    notes[i].size()
-                )
-            }
-
-            p.fill("#FA4529");
-            p.rect(0, barY, visualisationAreaWidth, barHeight + bottomBarHeight);
-
-            p.image(
-                drum,
-                visualisationAreaWidth - drumWidth - drumRightPadding,
-                barY + drumTopPadding,
-                drumWidth,
-                drumHeight
-            )
-
-            p.strokeWeight(barBorderStrokeWeight);
-            p.stroke("#000000");
-            p.line(0, barY, window.innerWidth, barY);
-            p.line(0, barY + barHeight + bottomBarHeight, window.innerWidth, barY + barHeight + bottomBarHeight);
-            p.strokeWeight(baseStrokeWeight);
-
-            if (maintainedFrames) {
-                if (destroyedNoteAccuracy !== 2) {
-                    let imageToUse;
-                    if (destroyedNoteBig) {
-                        imageToUse = destroyedNoteAccuracy === 0 ? b_good : b_ok;
-                    } else {
-                        imageToUse = destroyedNoteAccuracy === 0 ? good : ok;
-                    }
-                    p.image(
-                        imageToUse,
-                        padX - splashRadius / 2,
-                        padY - splashRadius / 2,
-                        splashRadius,
-                        splashRadius
-                    )
-                }
-
-                --maintainedFrames;
-            }
-
-            if (textMaintainedFrames) {
-                const textImages = [good_text, ok_text, bad_text];
-                const textWidths = [goodTextWidth, okTextWidth, badTextWidth];
-
-                p.image(
-                    textImages[destroyedNoteAccuracy],
-                    padX - textWidths[destroyedNoteAccuracy] / 2,
-                    padY - textHeight - textBottomPadding,
-                    textWidths[destroyedNoteAccuracy],
-                    textHeight
-                );
-
-                --textMaintainedFrames;
-            }
-
-            if (tappedDrumMaintainedFrames) {
-                // Use easeOutCurve for transparency
-                p.tint(255, 255 * easeOutCurve(tappedDrumMaintainedFrames / 7)[1]);
-
-                let imageToUse;
-                if (tappedDrumType === NoteType.DON) {
-                    imageToUse = tappedDrumSide === 0 ? drum_don_left : drum_don_right;
-                } else {
-                    imageToUse = tappedDrumSide === 0 ? drum_ka_left : drum_ka_right;
-                }
-                p.image(
-                    imageToUse,
-                    visualisationAreaWidth - drumWidth - drumRightPadding,
-                    barY + drumTopPadding,
-                    drumWidth,
-                    drumHeight
-                )
-                p.noTint();
-
-                --tappedDrumMaintainedFrames;
-            }
-
-            if (combo >= 10) {
-                p.noFill()
-                p.stroke("#000000");
-                p.strokeWeight(comboStrokeWeight);
-                p.textFont(taikoFont);
-                p.textAlign(p.CENTER);
-
-                p.textSize(comboTextSize);
-                p.text(combo, visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTextBottomPadding);
-                p.textSize(comboTitleSize);
-                p.text("Combo", visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTitleBottomPadding);
-
-                p.noStroke();
-                p.fill("#ffffff");
-                p.textSize(comboTextSize);
-                p.text(combo, visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTextBottomPadding);
-                p.textSize(comboTitleSize);
-                p.text("Combo", visualisationAreaWidth - drumWidth / 2 - drumRightPadding, barY + drumHeight - comboTitleBottomPadding);
-
-                p.textAlign(p.LEFT);
-            }
-
-            p.fill("#000000");
-            p.noStroke();
-            p.rect(0, barY, scoreBackgroundWidth, scoreBackgroundHeight, 0, 0, scoreBackgroundRadius, 0);
-
-            p.fill("#ffffff");
-            p.noStroke();
-            p.textAlign(p.RIGHT);
-            p.textSize(scoreTextSize);
-            p.text(score, scoreBackgroundWidth - scoreTextRightPadding, barY + scoreTextTopPadding);
-
-            p.fill("#FA4529");
-            p.noStroke();
-            p.textAlign(p.LEFT);
-            p.textSize(fpsTextSize);
-            p.text("fps: " + p.frameRate().toFixed(2), fpsTextLeftPadding, fpsTextTopPadding);
-
-            frame += 1;
-        };
-
-        const keyPressed = (p: p5) => {
-            if (enteredMainDrawLoop) {
-                if (p.keyCode === p.ESCAPE || p.key === 'q') {
-                    paused = !paused;
-                    if (paused) {
-                        song.pause();
-                    } else {
-                        song.play();
-                    }
-                    return;
-                }
-
-                if (paused) {
-                    return;
-                }
-
-                const noteIDsToDestroy = notesToDestroy.map((n) => n[0]);
-                const withoutToDestroy = notes.filter((n) => !noteIDsToDestroy.includes(n.id));
-                let closest = findClosestIndex(withoutToDestroy.map((n) => n.xEnd), frame);
-
-                const keyToNoteType = {
-                    "d": NoteType.KA,
-                    "f": NoteType.DON,
-                    "j": NoteType.DON,
-                    "k": NoteType.KA
-                };
-
-                const triggeredNoteType: NoteType = keyToNoteType[p.key as ("d" | "f" | "j" | "k")];
-
-                const noteTypeToSound = {
-                    [NoteType.DON]: don_sound,
-                    [NoteType.KA]: ka_sound
-                };
-
-                tappedDrumMaintainedFrames = 7;
-                tappedDrumType = triggeredNoteType;
-                tappedDrumSide = p.key === 'd' || p.key === 'f' ? 0 : 1;
-
-                (noteTypeToSound[triggeredNoteType]?.cloneNode(true) as HTMLAudioElement).play();
-
-                if (withoutToDestroy[closest].type === triggeredNoteType) {
-                    const accuracy = Math.abs(withoutToDestroy[closest].xEnd - frame);
-                    if (accuracy < 2) {
-                        ++goodNotes;
-                        notesToDestroy.push([withoutToDestroy[closest].id, 0]);
-                        ++combo;
-                        if (scoreMode == 1) {
-                            score += scoreInit + Math.max(0, scoreDiff * Math.floor(Math.min(combo, 100) - 1) / 10);
-                        } else if (scoreMode == 2) {
-                            if (combo >= 100) {
-                                score += scoreInit + scoreDiff * 8;
-                            } else if (combo >= 50) {
-                                score += scoreInit + scoreDiff * 4;
-                            } else if (combo >= 30) {
-                                score += scoreInit + scoreDiff * 2;
-                            } else if (combo >= 10) {
-                                score += scoreInit + scoreDiff;
-                            } else {
-                                score += scoreInit;
-                            }
-                        }
-                    } else if (accuracy < 6) {
-                        ++okNotes;
-                        notesToDestroy.push([withoutToDestroy[closest].id, 1]);
-                        ++combo;
-                        if (scoreMode == 1) {
-                            score += (scoreInit + Math.max(0, scoreDiff * Math.floor(Math.min(combo, 100) - 1) / 10)) / 2;
-                        } else if (scoreMode == 2) {
-                            if (combo >= 100) {
-                                score += (scoreInit + scoreDiff * 8) / 2;
-                            } else if (combo >= 50) {
-                                score += (scoreInit + scoreDiff * 4) / 2;
-                            } else if (combo >= 30) {
-                                score += (scoreInit + scoreDiff * 2) / 2;
-                            } else if (combo >= 10) {
-                                score += (scoreInit + scoreDiff) / 2;
-                            } else {
-                                score += (scoreInit) / 2;
-                            }
-                        }
-                    } else if (accuracy < 8) {
-                        ++badNotes;
-                        notesToDestroy.push([withoutToDestroy[closest].id, 2]);
-                        combo = 0;
-                    }
+            // Draw the vector field
+            const vectorField = vectorFieldDo(Fx, Fy);
+            for (let x = 0; x < p.width; x += 50) {
+                for (let y = 0; y < p.height; y += 50) {
+                    const vector = vectorField(getVector(x, y));
+                    p.push();
+                    p.translate(x, y);
+                    p.stroke(0);
+                    p.strokeWeight(2);
+                    p.line(0, 0, vector.x * 20, vector.y * 20);
+                    p.pop();
                 }
             }
-        };
+        }
 
         let sketch = (p: p5) => {
             p.preload = () => {
-                preload(p);
+
             };
+
             p.setup = () => {
                 setup(p);
             };
 
             p.mouseClicked = () => {
-                if (!enteredMainDrawLoop && !showTutorial) showTutorial = true;
             };
 
             p.draw = () => {
-                if (!enteredMainDrawLoop) {
-                    p.image(
-                        showTutorial ? tutorial : title_screen,
-                        innerWidth / 2 - (showTutorial ? tutorialWidth : titleScreenWidth) / 2,
-                        0,
-                        showTutorial ? tutorialWidth : titleScreenWidth,
-                        showTutorial ? tutorialHeight : titleScreenHeight
-                    );
-                    if (p.keyIsPressed && p.keyCode == p.ENTER && !lastFrameKeyPressed) {
-                        showTutorial ? (enteredMainDrawLoop = true, song.play()) : showTutorial = true;
-                    }
-                    lastFrameKeyPressed = p.keyIsPressed;
-                } else {
-                    draw(p);
-                }
+                draw(p);
             };
-
-            p.keyPressed = () => {
-                keyPressed(p);
-            }
         };
 
         new p5(sketch, document.getElementById("sketch") as HTMLElement);
