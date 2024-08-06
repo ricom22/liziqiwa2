@@ -1,9 +1,14 @@
+import p5 from 'p5';
 import * as utils from './utils';
 
 /* Types */
 export type Vector = {
     x: number,
     y: number
+}
+
+export const vec2vec = (v: Vector): p5.Vector => {
+    return new p5.Vector(v.x, v.y);
 }
 
 export type Scalar = {
